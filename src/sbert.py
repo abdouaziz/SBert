@@ -188,7 +188,7 @@ class BertForSimilarity(nn.Module):
 
 def loss_fn(outputs, labels):
 
-    return nn.CrossEntropyLoss()(outputs, labels)
+    return nn.BCEWithLogitsLoss()(outputs, labels)
 
 
 def yield_optimizer(model, args):
@@ -212,7 +212,7 @@ def yield_optimizer(model, args):
             "weight_decay": 0.0,
         },
     ]
-    return AdamW(optimizer_parameters, lr=args.learning_rate, eps=args.episilone)
+    return AdamW(optimizer_parameters, lr=args.learning_rate, eps=args.epsilone)
 
 
 def train_epoch(model, data_loader, loss_fn, optimizer, device, scheduler, n_examples):
@@ -229,9 +229,12 @@ def train_epoch(model, data_loader, loss_fn, optimizer, device, scheduler, n_exa
         mask2 = data['mask2'].to(device)
         token2 = data['token2'].to(device)
         targets = data['labels'].to(device)
+        print( f"the target is {targets} , the type of target is {type(targets)}")
       #  optimizer.zero_grad()
         outputs = model(ids1, mask1, token1, ids2, mask2, token2)
+        print( f"the output is {outputs} , the type of output is {type(outputs)}")
 
+        
         _, pred = torch.max(outputs, dim=1)
 
         loss = loss_fn(outputs, targets)
@@ -280,24 +283,24 @@ def main():
     args = parse_args()
     model = BertForSimilarity(device)
 
-    tokenizer = BertTokenizer.from_pretrained(args.bert_model_name)
+    tokenizer = BertTokenizer.from_pretrained(args.model_name)
 
-    df = pd.read_csv(args.data_path)
+    df = pd.read_csv(args.train_file)
 
     train_data, test_data = train_test_split(
         df, test_size=0.2, random_state=42)
 
     traindataloader = similarity_dataloader(
-        train_data, args.batch_size, tokenizer, args.max_length)
+        train_data, args.train_batch_size , tokenizer, args.max_length)
     testdataloader = similarity_dataloader(
-        test_data, args.batch_size, tokenizer, args.max_length)
+        test_data, args.train_batch_size, tokenizer, args.max_length)
 
     best_accuracy = 0
     some_val = 0
 
     nb_train_steps = int(len(traindataloader) /
                          args.train_batch_size * args.epochs)
-    optimizer = yield_optimizer(model)
+    optimizer = yield_optimizer(model ,args)
     scheduler = get_linear_schedule_with_warmup(
         optimizer,
         num_warmup_steps=0,
